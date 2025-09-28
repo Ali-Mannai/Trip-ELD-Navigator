@@ -24,6 +24,7 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
   const defaultCenter: [number, number] = [40.7128, -74.0060];
   const defaultZoom = 4;
 
+
   // Calculate route bounds and center
   const getRouteBounds = () => {
     if (!routeData) return null;
@@ -35,13 +36,10 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
       allPoints.push([stop.latitude, stop.longitude]);
     });
 
-    // Add duty schedule locations (simplified - in production, you'd geocode these)
-    const mockLocations = [
-      [40.7128, -74.0060], // New York
-      [34.0522, -118.2437], // Los Angeles
-      [41.8781, -87.6298], // Chicago
-    ];
-    allPoints.push(...(mockLocations as [number, number][]));
+    // Add duty schedule locations
+    routeData.duty_schedule.forEach(point => {
+      allPoints.push([point.latitude, point.longitude]);
+    });
 
     if (allPoints.length === 0) return null;
 
@@ -58,16 +56,11 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
     }
   }, [routeData]);
 
-  // Create route polyline (simplified - in production, use actual route coordinates)
+  // Create route polyline from duty schedule
   const getRoutePolyline = (): [number, number][] => {
     if (!routeData) return [];
     
-    // Simplified route between major cities
-    return [
-      [40.7128, -74.0060], // New York
-      [34.0522, -118.2437], // Los Angeles
-      [41.8781, -87.6298], // Chicago
-    ];
+    return routeData.duty_schedule.map(point => [point.latitude, point.longitude]);
   };
 
   // Create custom icons
@@ -97,6 +90,36 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
   const pickupIcon = createCustomIcon('#3b82f6', 'P');
   const dropoffIcon = createCustomIcon('#ef4444', 'D');
   const fuelIcon = createCustomIcon('#f59e0b', 'F');
+  const restIcon = createCustomIcon('#8b5cf6', 'R');
+
+  // Get key locations from duty schedule
+  const getKeyLocations = () => {
+    if (!routeData) return { current: null, pickup: null, dropoff: null };
+    
+    const current = routeData.duty_schedule.find(point => 
+      point.status === 'Off Duty' && point.miles_from_start === 0
+    );
+    const pickup = routeData.duty_schedule.find(point => 
+      point.status === 'On Duty' && point.location.toLowerCase().includes('pickup')
+    );
+    const dropoff = routeData.duty_schedule.find(point => 
+      point.status === 'On Duty' && point.location.toLowerCase().includes('dropoff')
+    );
+    
+    return { current, pickup, dropoff };
+  };
+
+  // Get rest stops from duty schedule
+  const getRestStops = () => {
+    if (!routeData) return [];
+    
+    return routeData.duty_schedule.filter(point => 
+      point.status === 'Off Duty' && point.miles_from_start > 0
+    );
+  };
+
+  const { current, pickup, dropoff } = getKeyLocations();
+  const restStops = getRestStops();
 
   return (
     <div className="card">
@@ -124,40 +147,61 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
                 opacity={0.8}
               />
               
-              {/* Start location */}
-              <Marker position={[40.7128, -74.0060]} icon={startIcon}>
-                <Popup>
-                  <div className="text-center">
-                    <h4 className="font-semibold">Start Location</h4>
-                    <p className="text-sm text-gray-600">Current Position</p>
-                  </div>
-                </Popup>
-              </Marker>
+              {/* Current location */}
+              {current && (
+                <Marker position={[current.latitude, current.longitude]} icon={startIcon}>
+                  <Popup>
+                    <div className="text-center">
+                      <h4 className="font-semibold">Current Location</h4>
+                      <p className="text-sm text-gray-600">{current.location}</p>
+                      <p className="text-xs text-gray-500">
+                        Arrival: {new Date(current.arrival_time).toLocaleString()}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
               
               {/* Pickup location */}
-              <Marker position={[34.0522, -118.2437]} icon={pickupIcon}>
-                <Popup>
-                  <div className="text-center">
-                    <h4 className="font-semibold">Pickup Location</h4>
-                    <p className="text-sm text-gray-600">Los Angeles, CA</p>
-                  </div>
-                </Popup>
-              </Marker>
+              {pickup && (
+                <Marker position={[pickup.latitude, pickup.longitude]} icon={pickupIcon}>
+                  <Popup>
+                    <div className="text-center">
+                      <h4 className="font-semibold">Pickup Location</h4>
+                      <p className="text-sm text-gray-600">{pickup.location}</p>
+                      <p className="text-xs text-gray-500">
+                        Arrival: {new Date(pickup.arrival_time).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Departure: {new Date(pickup.departure_time).toLocaleString()}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
               
               {/* Dropoff location */}
-              <Marker position={[41.8781, -87.6298]} icon={dropoffIcon}>
-                <Popup>
-                  <div className="text-center">
-                    <h4 className="font-semibold">Dropoff Location</h4>
-                    <p className="text-sm text-gray-600">Chicago, IL</p>
-                  </div>
-                </Popup>
-              </Marker>
+              {dropoff && (
+                <Marker position={[dropoff.latitude, dropoff.longitude]} icon={dropoffIcon}>
+                  <Popup>
+                    <div className="text-center">
+                      <h4 className="font-semibold">Dropoff Location</h4>
+                      <p className="text-sm text-gray-600">{dropoff.location}</p>
+                      <p className="text-xs text-gray-500">
+                        Arrival: {new Date(dropoff.arrival_time).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Departure: {new Date(dropoff.departure_time).toLocaleString()}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
               
               {/* Fueling stops */}
               {routeData.route.fueling_stops.map((stop, index) => (
                 <Marker
-                  key={index}
+                  key={`fuel-${index}`}
                   position={[stop.latitude, stop.longitude]}
                   icon={fuelIcon}
                 >
@@ -165,6 +209,34 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
                     <div className="text-center">
                       <h4 className="font-semibold">Fuel Stop #{index + 1}</h4>
                       <p className="text-sm text-gray-600">{stop.name}</p>
+                      <p className="text-xs text-gray-500">
+                        Coordinates: {stop.latitude.toFixed(4)}, {stop.longitude.toFixed(4)}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+              
+              {/* Rest stops */}
+              {restStops.map((stop, index) => (
+                <Marker
+                  key={`rest-${index}`}
+                  position={[stop.latitude, stop.longitude]}
+                  icon={restIcon}
+                >
+                  <Popup>
+                    <div className="text-center">
+                      <h4 className="font-semibold">Rest Stop #{index + 1}</h4>
+                      <p className="text-sm text-gray-600">{stop.location}</p>
+                      <p className="text-xs text-gray-500">
+                        Arrival: {new Date(stop.arrival_time).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Departure: {new Date(stop.departure_time).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Miles from start: {stop.miles_from_start.toFixed(1)}
+                      </p>
                     </div>
                   </Popup>
                 </Marker>
@@ -175,10 +247,10 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
       </div>
       
       {routeData && (
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-            <span>Start</span>
+            <span>Current</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
@@ -191,6 +263,10 @@ const MapView: React.FC<MapViewProps> = ({ routeData, height = '400px' }) => {
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
             <span>Fuel Stop</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
+            <span>Rest Stop</span>
           </div>
         </div>
       )}

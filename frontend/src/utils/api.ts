@@ -24,6 +24,8 @@ export interface FuelingStop {
 
 export interface DutySchedulePoint {
   location: string;
+  latitude: number;
+  longitude: number;
   arrival_time: string;
   departure_time: string;
   status: 'Driving' | 'On Duty' | 'Sleeper' | 'Off Duty';
