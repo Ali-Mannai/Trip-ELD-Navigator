@@ -52,6 +52,8 @@ def calculate_route(request):
                 "duty_schedule": [
                     {
                         "location": point.location.name,
+                        "latitude": point.location.latitude,
+                        "longitude": point.location.longitude,
                         "arrival_time": point.arrival_time.isoformat(),
                         "departure_time": point.departure_time.isoformat(),
                         "status": point.status,
@@ -113,6 +115,8 @@ def route(request):
                 "duty_schedule": [
                     {
                         "location": point.location.name,
+                        "latitude": point.location.latitude,
+                        "longitude": point.location.longitude,
                         "arrival_time": point.arrival_time.isoformat(),
                         "departure_time": point.departure_time.isoformat(),
                         "status": point.status,

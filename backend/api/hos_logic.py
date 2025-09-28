@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 import math
+import requests
+import time
 
 
 @dataclass
@@ -41,6 +43,47 @@ class RouteDetails:
     violations: List[str]
 
 
+def geocode_location(location_str: str) -> Tuple[float, float]:
+    """
+    Geocode a location string to coordinates using OpenStreetMap Nominatim.
+    
+    Args:
+        location_str: Location string to geocode
+        
+    Returns:
+        Tuple of (latitude, longitude)
+    """
+    try:
+        # Use OpenStreetMap Nominatim API for geocoding
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            'q': location_str,
+            'format': 'json',
+            'limit': 1,
+            'addressdetails': 1
+        }
+        headers = {
+            'User-Agent': 'Trip-ELD-Navigator/1.0'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        if data and len(data) > 0:
+            lat = float(data[0]['lat'])
+            lon = float(data[0]['lon'])
+            return lat, lon
+        else:
+            # Fallback to default coordinates if geocoding fails
+            return 40.7128, -74.0060  # New York as default
+            
+    except Exception as e:
+        print(f"Geocoding failed for '{location_str}': {e}")
+        # Fallback to default coordinates
+        return 40.7128, -74.0060
+
+
 class HOSCalculator:
     """
     Main class for calculating Hours of Service compliance and route planning.
@@ -61,6 +104,7 @@ class HOSCalculator:
     def __init__(self):
         self.current_cycle_used = 0.0
         self.duty_status_history = []
+        self.location_cache = {}  # Cache for geocoded locations
         
     def calculate_route(self, 
                        current_location: str,
@@ -117,27 +161,25 @@ class HOSCalculator:
     
     def _parse_location(self, location_str: str) -> Location:
         """
-        Parse location string into Location object.
-        For now, returns mock coordinates. In production, use geocoding service.
+        Parse location string into Location object using geocoding.
         """
-        # Mock coordinates - in production, use geocoding API
-        mock_coords = {
-            "current": (40.7128, -74.0060),  # New York
-            "pickup": (34.0522, -118.2437),  # Los Angeles
-            "dropoff": (41.8781, -87.6298),  # Chicago
-        }
+        # Check cache first
+        if location_str in self.location_cache:
+            return self.location_cache[location_str]
         
-        if "current" in location_str.lower():
-            lat, lon = mock_coords["current"]
-        elif "pickup" in location_str.lower():
-            lat, lon = mock_coords["pickup"]
-        elif "dropoff" in location_str.lower():
-            lat, lon = mock_coords["dropoff"]
-        else:
-            # Default coordinates
-            lat, lon = 40.7128, -74.0060
-            
-        return Location(name=location_str, latitude=lat, longitude=lon)
+        # Geocode the location
+        lat, lon = geocode_location(location_str)
+        
+        # Create location object
+        location = Location(name=location_str, latitude=lat, longitude=lon)
+        
+        # Cache the result
+        self.location_cache[location_str] = location
+        
+        # Add a small delay to respect Nominatim rate limits
+        time.sleep(0.1)
+        
+        return location
     
     def _calculate_distance(self, loc1: Location, loc2: Location) -> float:
         """
