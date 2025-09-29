@@ -328,10 +328,10 @@ const LogSheet: React.FC<LogSheetProps> = ({ entries, startDate, endDate }) => {
           const x = calculateXPosition(remark.time);
           const vY1 = baseY;           // start at grid bottom
           const vY2 = baseY + 18;      // vertical drop
-          const dir = index % 2 === 0 ? -1 : 1; // alternate left/right
+          const dir = -1; // always orient to left
           const hX = x + dir * 60;
           const hY = vY2 + 18;
-          const anchor = dir === -1 ? 'end' : 'start';
+          const anchor = 'end';
           const label = `${remark.type.toUpperCase()}: ${remark.location}`;
 
           return (
