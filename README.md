@@ -1,32 +1,33 @@
 # Trip-ELD-Navigator
 
-A Django REST Framework API backend for the Trip ELD Navigator application.
+A full‑stack app (Django REST Framework + React/Vite + Tailwind) that plans HOS‑compliant trips and renders FMCSA‑style ELD log sheets.
 
 ## Project Structure
 
 ```
 Trip-ELD-Navigator/
-├── backend/                 # Django project
-│   ├── backend/            # Django settings and configuration
-│   │   ├── __init__.py
-│   │   ├── settings.py     # Django settings with DRF and CORS
-│   │   ├── urls.py         # Main URL configuration
-│   │   ├── wsgi.py         # WSGI configuration for deployment
-│   │   └── asgi.py         # ASGI configuration
-│   ├── api/                # Django REST Framework API app
-│   │   ├── __init__.py
-│   │   ├── apps.py
-│   │   ├── models.py
-│   │   ├── views.py        # API views
-│   │   ├── urls.py         # API URL patterns
-│   │   ├── serializers.py  # DRF serializers
-│   │   ├── admin.py
-│   │   └── tests.py
-│   └── manage.py           # Django management script
-├── requirements.txt        # Python dependencies
-├── Procfile               # Render deployment configuration
-└── .gitignore            # Git ignore file
+├── backend/                  # Django project
+│   ├── backend/              # Django settings and configuration
+│   ├── api/                  # DRF app (endpoints + HOS logic)
+│   └── manage.py
+├── frontend/                 # React (Vite + Tailwind)
+│   └── src/
+│       ├── components/
+│       │   ├── TripForm.tsx  # Trip input + validation
+│       │   ├── MapView.tsx   # Route map (Leaflet)
+│       │   ├── LogSheet.tsx  # SVG FMCSA log sheet
+│       │   └── Summary.tsx   # Cards & analytics
+│       ├── pages/Home.tsx    # App layout & tabs
+│       └── utils/api.ts      # Axios client
+├── requirements.txt          # Python dependencies
+├── Procfile                  # gunicorn entry for Render
+└── README.md
 ```
+
+## Tech Stack
+- Backend: Django 4, Django REST Framework, django‑cors‑headers, gunicorn
+- Frontend: React 19, Vite, TypeScript, Tailwind v4, Leaflet/react‑leaflet
+- Deploy: Render (backend, Python Web Service), Vercel (frontend)
 
 ## Setup Instructions
 
@@ -72,7 +73,7 @@ Trip-ELD-Navigator/
 
 The API will be available at `http://127.0.0.1:8000/`
 
-## API Endpoints
+## API Endpoints (backend)
 
 ### Health Check
 - **GET** `/api/health/`
@@ -217,12 +218,35 @@ This project is configured for deployment on Render with the following files:
 - `requirements.txt`: Lists all Python dependencies
 - `backend/settings.py`: Configured with production-ready settings
 
-### Deploy to Render
+### Deploy to Render (Python Web Service)
+Root Directory: `backend`
 
-1. Push your code to a Git repository
-2. Connect the repository to Render
-3. Render will automatically detect the Django project and use the Procfile
-4. The application will be deployed and accessible via the provided URL
+Build command:
+```
+pip install -r ../requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput
+```
+
+Start command:
+```
+gunicorn backend.wsgi:application
+```
+
+Environment variables (example):
+- `DJANGO_DEBUG=false`
+- `DJANGO_ALLOWED_HOSTS=your-backend.onrender.com`
+- `FRONTEND_ORIGINS=https://your-frontend.vercel.app`
+- `CSRF_TRUSTED=https://your-backend.onrender.com,https://your-frontend.vercel.app`
+- `SECRET_KEY=<strong-random>`
+
+Health check: `GET https://your-backend.onrender.com/api/health/`
+
+## Deployment on Vercel (frontend)
+Project Root: `frontend`
+
+Environment variables:
+- `VITE_API_BASE_URL=https://your-backend.onrender.com/api`
+
+Build/Framework: Vite (React + TS). After setting env, redeploy so the API base URL is baked into the build.
 
 ## HOS Logic Features
 
@@ -251,17 +275,24 @@ The `hos_logic.py` module implements comprehensive FMCSA Hours of Service rules:
 
 ## Configuration
 
-### CORS Settings
-The project is configured to allow cross-origin requests from:
-- `http://localhost:3000` (React development server)
-- `http://127.0.0.1:3000`
-- Any other origins specified in `CORS_ALLOWED_ORIGINS`
+### CORS / Security
+- CORS allowlist is driven by env vars in `backend/backend/settings.py`:
+  - `FRONTEND_ORIGINS` (comma‑separated)
+  - `CSRF_TRUSTED` (comma‑separated)
+- Local dev origins (Tailwind/Vite) use port 5173 by default.
 
 ### Security Notes
 - Change the `SECRET_KEY` in production
 - Set `DEBUG = False` in production
 - Configure proper `ALLOWED_HOSTS` for production
 - Use environment variables for sensitive settings
+
+## Frontend Views (interfaces)
+
+- TripForm (sidebar): inputs current location, pickup, dropoff, cycle hours; validation, swap button, loading state.
+- MapView (tab: Route Map): renders route polyline and markers for fueling stops (Leaflet).
+- LogSheet (tab: Log Sheet): SVG FMCSA‑style 24‑hour grid, statuses on rows (Off Duty, Sleeper, Driving, On Duty), leader‑line remarks, multi‑day support, midnight‑to‑midnight scale.
+- Summary (tab: Summary): overview KPIs, violations, fueling stops grid, duty schedule cards (Uiverse‑style hover).
 
 ## Development
 
@@ -289,4 +320,22 @@ python manage.py migrate
 python manage.py runserver
 # Then visit http://127.0.0.1:8000/admin/
 ```
-A full-stack Django-React app that takes truck trip inputs (locations, hours used) and generates optimized routes with maps, rest stops, and automated ELD daily log sheets for HOS compliance.
+## Local Run
+
+Backend
+```
+cd backend
+python manage.py runserver
+```
+
+Frontend
+```
+cd frontend
+npm run dev
+```
+
+Set `VITE_API_BASE_URL` to `http://127.0.0.1:8000/api` during local development if needed.
+
+---
+
+This app takes trip inputs (locations, hours used) and produces route analytics, fueling stops, and FMCSA‑style daily log sheets for HOS compliance.
