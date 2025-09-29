@@ -90,21 +90,21 @@ class HOSCalculator:
     """
     
     # FMCSA Constants
-    MAX_DRIVING_HOURS = 11  # Maximum driving hours in a 14-hour window
-    MAX_DUTY_HOURS = 14     # Maximum duty hours in a 14-hour window
-    MIN_OFF_DUTY_HOURS = 10 # Minimum off-duty hours after max driving/duty
-    BREAK_THRESHOLD = 8     # Hours of driving before requiring 30-min break
-    BREAK_DURATION = 0.5    # 30-minute break duration in hours
-    FUELING_INTERVAL = 1000 # Miles between fueling stops
-    PICKUP_TIME = 1         # Hours for pickup (On Duty Not Driving)
-    DROPOFF_TIME = 1        # Hours for dropoff (On Duty Not Driving)
-    MAX_70_HOUR_WINDOW = 70 # Maximum hours in 8-day period
+    MAX_DRIVING_HOURS = 11  
+    MAX_DUTY_HOURS = 14     
+    MIN_OFF_DUTY_HOURS = 10 
+    BREAK_THRESHOLD = 8     
+    BREAK_DURATION = 0.5    
+    FUELING_INTERVAL = 1000 
+    PICKUP_TIME = 1         
+    DROPOFF_TIME = 1        
+    MAX_70_HOUR_WINDOW = 70 
     DAYS_IN_70_HOUR_WINDOW = 8
     
     def __init__(self):
         self.current_cycle_used = 0.0
         self.duty_status_history = []
-        self.location_cache = {}  # Cache for geocoded locations
+        self.location_cache = {} 
         
     def calculate_route(self, 
                        current_location: str,
@@ -214,7 +214,6 @@ class HOSCalculator:
         miles_so_far = 0
         while miles_so_far + self.FUELING_INTERVAL < distance_to_pickup:
             miles_so_far += self.FUELING_INTERVAL
-            # Interpolate location (simplified - in production use proper route calculation)
             stop_location = self._interpolate_location(current, pickup, miles_so_far / distance_to_pickup)
             stops.append(stop_location)
         
