@@ -202,23 +202,32 @@ def generate_log_sheet_entries(start_date, end_date):
     current_date = start_date
     
     while current_date <= end_date:
-        # Generate sample entries for each day
+        # Per-day variation so sheets are not identical
+        day_index = (current_date - start_date).days
+        shift_hours = (day_index % 4)  # 0..3 hour shift
+
+        def add_hours_str(hhmm: str, hours: int) -> str:
+            base_h, base_m = map(int, hhmm.split(":"))
+            total = (base_h + hours) % 24
+            return f"{total:02d}:{base_m:02d}"
+
+        # Generate sample entries for each day with a small time shift
         day_entries = [
             {
                 "date": current_date.strftime("%Y-%m-%d"),
                 "time_blocks": [
                     {
-                        "start_time": "08:00",
-                        "end_time": "12:00",
+                        "start_time": add_hours_str("08:00", shift_hours),
+                        "end_time": add_hours_str("12:00", shift_hours),
                         "status": "Driving",
                         "location": "Highway I-95",
                         "odometer_start": 125000,
                         "odometer_end": 125200,
-                        "notes": "Route to pickup location"
+                        "notes": "pickup en route" if day_index % 2 == 0 else "fuel stop"
                     },
                     {
-                        "start_time": "12:00",
-                        "end_time": "13:00",
+                        "start_time": add_hours_str("12:00", shift_hours),
+                        "end_time": add_hours_str("13:00", shift_hours),
                         "status": "On Duty",
                         "location": "Pickup Location",
                         "odometer_start": 125200,
@@ -226,17 +235,17 @@ def generate_log_sheet_entries(start_date, end_date):
                         "notes": "Loading cargo"
                     },
                     {
-                        "start_time": "13:00",
-                        "end_time": "17:00",
+                        "start_time": add_hours_str("13:00", shift_hours),
+                        "end_time": add_hours_str("17:00", shift_hours),
                         "status": "Driving",
                         "location": "Highway I-80",
                         "odometer_start": 125200,
                         "odometer_end": 125400,
-                        "notes": "Route to dropoff location"
+                        "notes": "rest" if day_index % 3 == 0 else "route to dropoff"
                     },
                     {
-                        "start_time": "17:00",
-                        "end_time": "18:00",
+                        "start_time": add_hours_str("17:00", shift_hours),
+                        "end_time": add_hours_str("18:00", shift_hours),
                         "status": "On Duty",
                         "location": "Dropoff Location",
                         "odometer_start": 125400,
@@ -244,8 +253,8 @@ def generate_log_sheet_entries(start_date, end_date):
                         "notes": "Unloading cargo"
                     },
                     {
-                        "start_time": "18:00",
-                        "end_time": "08:00",
+                        "start_time": add_hours_str("18:00", shift_hours),
+                        "end_time": add_hours_str("08:00", shift_hours),
                         "status": "Off Duty",
                         "location": "Rest Area",
                         "odometer_start": 125400,
