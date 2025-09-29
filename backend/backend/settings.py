@@ -24,9 +24,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-your-secret-key-here-change-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Read from environment for deployment
+DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
 
 # Application definition
@@ -139,13 +140,25 @@ REST_FRAMEWORK = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
+# Prefer explicit allowlist; can be overridden with env var FRONTEND_ORIGINS (comma-separated)
+_default_frontend_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://your-frontend-domain.com",  # Replace with your frontend domain
 ]
+_env_frontend_origins = [o for o in os.getenv('FRONTEND_ORIGINS', '').split(',') if o]
+CORS_ALLOWED_ORIGINS = _env_frontend_origins or _default_frontend_origins
 
 CORS_ALLOW_CREDENTIALS = True
 
-# Allow all origins in development (remove in production)
-CORS_ALLOW_ALL_ORIGINS = True
+# CSRF trusted origins (needed for Render/Vercel HTTPS)
+_default_csrf_trusted = [
+    "https://*.onrender.com",
+    "https://*.vercel.app",
+]
+_env_csrf_trusted = [o for o in os.getenv('CSRF_TRUSTED', '').split(',') if o]
+CSRF_TRUSTED_ORIGINS = _env_csrf_trusted or _default_csrf_trusted
+
+# In production, don't allow all origins
+CORS_ALLOW_ALL_ORIGINS = DEBUG
