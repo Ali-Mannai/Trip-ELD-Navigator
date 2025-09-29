@@ -10,9 +10,10 @@ interface TripFormProps {
   }) => void;
   loading?: boolean;
   result?: TripRouteResponse | null;
+  compact?: boolean;
 }
 
-const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result = null }) => {
+const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result = null, compact = false }) => {
   const [formData, setFormData] = useState({
     current_location: '',
     pickup_location: '',
@@ -65,9 +66,24 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result =
     }
   };
 
+  if (compact) {
+    return (
+      <div className="text-center">
+        <div className="text-4xl mb-4">🚛</div>
+        <p className="text-sm text-gray-500">Trip Form</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="card max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Trip Planning</h2>
+    <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+      <h2 className="text-xl font-bold text-gray-900 mb-2 flex items-center">
+        <span className="text-2xl mr-3">🚛</span>
+        Trip Planning
+      </h2>
+      <p className="text-sm text-gray-500 mb-6">
+        Enter your current position and trip details to plan a compliant route.
+      </p>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -81,14 +97,13 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result =
               name="current_location"
               value={formData.current_location}
               onChange={handleInputChange}
-              className={`input-field ${errors.current_location ? 'border-red-500' : ''}`}
+              className={`w-full px-3 py-2 border ${errors.current_location ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
               placeholder="e.g., New York, NY"
             />
             {errors.current_location && (
               <p className="mt-1 text-sm text-red-600">{errors.current_location}</p>
             )}
           </div>
-
           <div>
             <label htmlFor="pickup_location" className="block text-sm font-medium text-gray-700 mb-2">
               Pickup Location
@@ -99,7 +114,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result =
               name="pickup_location"
               value={formData.pickup_location}
               onChange={handleInputChange}
-              className={`input-field ${errors.pickup_location ? 'border-red-500' : ''}`}
+              className={`w-full px-3 py-2 border ${errors.pickup_location ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
               placeholder="e.g., Los Angeles, CA"
             />
             {errors.pickup_location && (
@@ -109,16 +124,30 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result =
         </div>
 
         <div>
-          <label htmlFor="dropoff_location" className="block text-sm font-medium text-gray-700 mb-2">
-            Dropoff Location
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="dropoff_location" className="block text-sm font-medium text-gray-700 mb-2">
+              Dropoff Location
+            </label>
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({
+                ...prev,
+                pickup_location: prev.dropoff_location,
+                dropoff_location: prev.pickup_location,
+              }))}
+              className="inline-flex items-center text-xs px-2 py-1 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+              title="Swap pickup and dropoff"
+            >
+              ↕ Swap
+            </button>
+          </div>
           <input
             type="text"
             id="dropoff_location"
             name="dropoff_location"
             value={formData.dropoff_location}
             onChange={handleInputChange}
-            className={`input-field ${errors.dropoff_location ? 'border-red-500' : ''}`}
+            className={`w-full px-3 py-2 border ${errors.dropoff_location ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
             placeholder="e.g., Chicago, IL"
           />
           {errors.dropoff_location && (
@@ -139,7 +168,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result =
             min="0"
             max="70"
             step="0.5"
-            className={`input-field ${errors.cycle_hours ? 'border-red-500' : ''}`}
+            className={`w-full px-3 py-2 border ${errors.cycle_hours ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
             placeholder="0"
           />
           {errors.cycle_hours && (
@@ -153,8 +182,14 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, loading = false, result =
         <button
           type="submit"
           disabled={loading}
-          className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
+          {loading && (
+            <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+          )}
           {loading ? 'Calculating Route...' : 'Calculate Route'}
         </button>
       </form>
