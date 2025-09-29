@@ -1,5 +1,5 @@
 import React from 'react';
-import type { LogEntry, TimeBlock } from '../utils/api';
+import type { LogEntry } from '../utils/api';
 
 interface LogSheetProps {
   entries: LogEntry[];
@@ -55,7 +55,8 @@ const LogSheet: React.FC<LogSheetProps> = ({ entries, startDate, endDate }) => {
   const calculateWidth = (startTime: string, endTime: string) => {
     const start = parseTime(startTime);
     const end = parseTime(endTime);
-    const duration = end - start;
+    const rawDuration = end - start;
+    const duration = rawDuration >= 0 ? rawDuration : (24 - start) + end; // handle wrap past midnight
     return (duration / 24) * GRID_WIDTH;
   };
 
@@ -68,13 +69,13 @@ const LogSheet: React.FC<LogSheetProps> = ({ entries, startDate, endDate }) => {
     return 'other';
   };
 
-  // Render the 24-hour time grid
+  // Render the 24-hour time grid (midnight to midnight)
   const renderTimeGrid = () => {
     const hours = Array.from({ length: 25 }, (_, i) => i);
-    
+
     return (
       <g>
-        {/* Hour lines */}
+        {/* Hour vertical grid lines */}
         {hours.map(hour => (
           <line
             key={hour}
@@ -82,24 +83,28 @@ const LogSheet: React.FC<LogSheetProps> = ({ entries, startDate, endDate }) => {
             y1={0}
             x2={hour * HOUR_WIDTH}
             y2={GRID_HEIGHT}
-            stroke="#e5e7eb"
-            strokeWidth="1"
+            stroke={hour % 6 === 0 ? '#cbd5e1' : '#e5e7eb'}
+            strokeWidth={hour % 6 === 0 ? 1.5 : 1}
           />
         ))}
-        
-        {/* Hour labels */}
+
+        {/* Baseline at top and bottom */}
+        <line x1={0} y1={0} x2={GRID_WIDTH} y2={0} stroke="#d1d5db" strokeWidth="1" />
+        <line x1={0} y1={GRID_HEIGHT} x2={GRID_WIDTH} y2={GRID_HEIGHT} stroke="#d1d5db" strokeWidth="1" />
+
+        {/* Hour labels at bottom to prevent overlap */}
         {hours.map(hour => (
           <text
             key={`label-${hour}`}
             x={hour * HOUR_WIDTH}
-            y={-10}
+            y={GRID_HEIGHT + 12}
             textAnchor="middle"
             fontSize="10"
             fill="#6b7280"
           >
-            {hour === 0 ? '12AM' : 
-             hour < 12 ? `${hour}AM` : 
-             hour === 12 ? '12PM' : 
+            {hour === 0 ? '12AM' :
+             hour < 12 ? `${hour}AM` :
+             hour === 12 ? '12PM' :
              `${hour - 12}PM`}
           </text>
         ))}
@@ -146,45 +151,61 @@ const LogSheet: React.FC<LogSheetProps> = ({ entries, startDate, endDate }) => {
     return (
       <g key={`periods-${dayIndex}`}>
         {entry.time_blocks.map((block, blockIndex) => {
-          const x = calculateXPosition(block.start_time);
-          const width = calculateWidth(block.start_time, block.end_time);
+          const start = parseTime(block.start_time);
+          const end = parseTime(block.end_time);
           const statusIndex = getStatusRowIndex(block.status);
           const y = statusIndex * STATUS_HEIGHT;
           const color = getStatusColor(block.status);
           const remarkType = getRemarkType(block.notes);
 
+          const segments: Array<{ x: number; width: number }> = [];
+          if (end >= start) {
+            // Same-day segment
+            const x = calculateXPosition(block.start_time);
+            const width = calculateWidth(block.start_time, block.end_time);
+            segments.push({ x, width });
+          } else {
+            // Wraps past midnight: split into two segments
+            const firstX = calculateXPosition(block.start_time);
+            const firstWidth = (24 - start) / 24 * GRID_WIDTH;
+            const secondX = calculateXPosition('00:00');
+            const secondWidth = end / 24 * GRID_WIDTH;
+            segments.push({ x: firstX, width: firstWidth });
+            segments.push({ x: secondX, width: secondWidth });
+          }
+
           return (
             <g key={`${dayIndex}-${blockIndex}`}>
-              {/* Duty period line */}
-              <rect
-                x={x}
-                y={y + 2}
-                width={Math.max(width, 2)} // Minimum width for visibility
-                height={STATUS_HEIGHT - 4}
-                fill={color}
-                stroke="#ffffff"
-                strokeWidth="1"
-                rx="1"
-              />
-              
-              {/* Time labels for periods longer than 1 hour */}
-              {width > 40 && (
-                <text
-                  x={x + width / 2}
-                  y={y + STATUS_HEIGHT / 2 + 4}
-                  textAnchor="middle"
-                  fontSize="9"
-                  fill="white"
-                  fontWeight="bold"
-                >
-                  {formatTime(block.start_time)}-{formatTime(block.end_time)}
-                </text>
-              )}
-              
-              {/* Remark indicators */}
+              {segments.map((seg, i) => (
+                <g key={i}>
+                  <rect
+                    x={seg.x}
+                    y={y + 2}
+                    width={Math.max(seg.width, 2)}
+                    height={STATUS_HEIGHT - 4}
+                    fill={color}
+                    stroke="#ffffff"
+                    strokeWidth="1"
+                    rx="1"
+                  />
+                  {seg.width > 40 && (
+                    <text
+                      x={seg.x + seg.width / 2}
+                      y={y + STATUS_HEIGHT / 2 + 4}
+                      textAnchor="middle"
+                      fontSize="9"
+                      fill="white"
+                      fontWeight="bold"
+                    >
+                      {formatTime(block.start_time)}-{formatTime(block.end_time)}
+                    </text>
+                  )}
+                </g>
+              ))}
+
               {remarkType !== 'other' && (
                 <circle
-                  cx={x + width / 2}
+                  cx={calculateXPosition(block.start_time) + Math.max(calculateWidth(block.start_time, block.end_time), 2) / 2}
                   cy={y + STATUS_HEIGHT - 8}
                   r="3"
                   fill="#fbbf24"
@@ -287,39 +308,46 @@ const LogSheet: React.FC<LogSheetProps> = ({ entries, startDate, endDate }) => {
   // Render remarks section
   const renderRemarks = (entry: LogEntry, dayIndex: number) => {
     const dayY = dayIndex * DAY_HEIGHT;
-    const remarksY = dayY + GRID_HEIGHT + 10;
-    
+    const baseY = dayY + GRID_HEIGHT; // bottom of grid
+
     const remarks = entry.time_blocks
       .filter(block => getRemarkType(block.notes) !== 'other')
       .map(block => ({
         time: block.start_time,
         type: getRemarkType(block.notes),
         location: block.location,
-        notes: block.notes
+        notes: block.notes,
       }));
 
     return (
       <g key={`remarks-${dayIndex}`}>
-        <text
-          x={0}
-          y={remarksY}
-          fontSize="10"
-          fontWeight="bold"
-          fill="#374151"
-        >
-          Remarks:
-        </text>
-        {remarks.map((remark, index) => (
-          <text
-            key={index}
-            x={0}
-            y={remarksY + 15 + (index * 12)}
-            fontSize="9"
-            fill="#6b7280"
-          >
-            {formatTime(remark.time)} - {remark.type.toUpperCase()}: {remark.location}
-          </text>
-        ))}
+        {/* Label */}
+        <text x={0} y={baseY + 10} fontSize="10" fontWeight="bold" fill="#374151">Remarks:</text>
+
+        {remarks.map((remark, index) => {
+          const x = calculateXPosition(remark.time);
+          const vY1 = baseY;           // start at grid bottom
+          const vY2 = baseY + 18;      // vertical drop
+          const dir = index % 2 === 0 ? -1 : 1; // alternate left/right
+          const hX = x + dir * 60;
+          const hY = vY2 + 18;
+          const anchor = dir === -1 ? 'end' : 'start';
+          const label = `${remark.type.toUpperCase()}: ${remark.location}`;
+
+          return (
+            <g key={index}>
+              {/* Leader lines */}
+              <line x1={x} y1={vY1} x2={x} y2={vY2} stroke="#9ca3af" strokeWidth="1" />
+              <line x1={x} y1={vY2} x2={hX} y2={hY} stroke="#9ca3af" strokeWidth="1" />
+              {/* Dot marker */}
+              <circle cx={x} cy={vY1 - 2} r="2" fill="#fbbf24" />
+              {/* Text */}
+              <text x={hX} y={hY + 10} textAnchor={anchor} fontSize="9" fill="#6b7280">
+                {label}
+              </text>
+            </g>
+          );
+        })}
       </g>
     );
   };
